@@ -1,32 +1,17 @@
-DEPS = $(wildcard */*.go)
-VERSION = $(shell git describe --always --dirty)
-COMMIT_SHA1 = $(shell git rev-parse HEAD)
-BUILD_DATE = $(shell date +%Y-%m-%d)
+.PHONY: all unit e2e bin tests
 
-all: vendor lint vet prometheus-puppetdb-exporter
+bin:
+	go build -ldflags="-X main.version=$(shell git describe) -X main.commitSha1=$(shell git rev-parse HEAD) -X main.buildDate=$(shell date -u +%Y%m%d)"
 
-prometheus-puppetdb-exporter: main.go $(DEPS)
-	GO111MODULE=on CGO_ENABLED=0 GOOS=linux \
-	  go build -a \
-		  -ldflags="-X main.version=$(VERSION) -X main.commitSha1=$(COMMIT_SHA1) -X main.buildDate=$(BUILD_DATE)" \
-	    -installsuffix cgo -o $@ $<
-	strip $@
+unit:
+	go test -race $(shell go list ./... | grep -v e2e)
 
-clean:
-	rm -f prometheus-puppetdb-exporter
+e2e:
+	go test -race $(shell go list ./... | grep e2e)
 
-lint:
-	@ go get -v golang.org/x/lint/golint
-	@for file in $$(git ls-files '*.go' | grep -v '_workspace/' | grep -v 'vendor/'); do \
-		export output="$$(golint $${file} | grep -v 'type name will be used as docker.DockerInfo')"; \
-		[ -n "$${output}" ] && echo "$${output}" && export status=1; \
-	done; \
-	exit $${status:-0}
+vet:
+	go vet ./...
 
-vet: main.go
-	go vet $<
+tests: vet unit e2e
 
-vendor:
-	go mod vendor
-
-.PHONY: all lint vet clean vendor
+all: unit e2e bin
