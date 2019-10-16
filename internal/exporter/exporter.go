@@ -151,9 +151,10 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 			statusName)
 	}
 
+	duration := 1000000 * time.Now().Sub(collectStart).Nanoseconds()
 	ch <- prometheus.MustNewConstMetric(
 		e.metrics["puppetdb_exporter_collect_duration"], prometheus.GaugeValue,
-		float64(time.Now().Sub(collectStart).Milliseconds()))
+		float64(duration))
 }
 
 func (e *Exporter) initGauges(categories map[string]struct{}) {
