@@ -11,7 +11,7 @@ import (
 	"github.com/camptocamp/prometheus-puppetdb-exporter/internal/puppetdb"
 )
 
-// ExporterConfig defines the config for Exporter
+// Config defines the config for Exporter
 type Config struct {
 	URL        string
 	CertPath   string
@@ -122,7 +122,8 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 		statuses[lastReportStatus]++
 
 		ch <- prometheus.MustNewConstMetric(
-			e.metrics["node_last_report_status"], prometheus.GaugeValue,
+			e.metrics["node_last_report_status"],
+			prometheus.GaugeValue,
 			1,
 			lastReportStatus, node.Certname,
 		)
@@ -146,14 +147,16 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 
 	for statusName, statusValue := range statuses {
 		ch <- prometheus.MustNewConstMetric(
-			e.metrics["node_report_status_count"], prometheus.GaugeValue,
+			e.metrics["node_report_status_count"],
+			prometheus.GaugeValue,
 			float64(statusValue),
 			statusName)
 	}
 
 	duration := 1000000 * time.Now().Sub(collectStart).Nanoseconds()
 	ch <- prometheus.MustNewConstMetric(
-		e.metrics["puppetdb_exporter_collect_duration"], prometheus.GaugeValue,
+		e.metrics["puppetdb_exporter_collect_duration"],
+		prometheus.GaugeValue,
 		float64(duration))
 }
 
