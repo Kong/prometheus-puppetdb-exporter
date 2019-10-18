@@ -23,7 +23,6 @@ type Config struct {
 	KeyFile        string `long:"key-file" description:"A PEM encoded private key file." env:"PUPPETDB_KEY_FILE"`
 	CACertFile     string `long:"ca-file" description:"A PEM encoded CA's certificate." env:"PUPPETDB_CA_FILE"`
 	SSLSkipVerify  bool   `long:"ssl-skip-verify" description:"Skip SSL verification." env:"PUPPETDB_SSL_SKIP_VERIFY"`
-	ScrapeInterval string `long:"scrape-interval" description:"Duration between two scrapes." env:"PUPPETDB_SCRAPE_INTERVAL" default:"5s"`
 	ListenAddress  string `long:"listen-address" description:"Address to listen on for web interface and telemetry." env:"PUPPETDB_LISTEN_ADDRESS" default:"0.0.0.0:9121"`
 	MetricPath     string `long:"metric-path" description:"Path under which to expose metrics." env:"PUPPETDB_METRIC_PATH" default:"/metrics"`
 	Verbose        bool   `long:"verbose" description:"Enable debug mode" env:"PUPPETDB_VERBOSE"`
@@ -64,9 +63,9 @@ func main() {
 		return
 	}
 
-	interval, err := time.ParseDuration(c.ScrapeInterval)
+	unreportedDuration, err := time.ParseDuration(c.UnreportedNode)
 	if err != nil {
-		log.Fatalf("failed to parse scrape interval duration: %s", err)
+		log.Fatalf("failed to parse unreported duration: %s", err)
 	}
 
 	// Create a map[string]struct{} of categories to provide an efficient way to
@@ -76,21 +75,29 @@ func main() {
 	for _, category := range cats {
 		categories[category] = struct{}{}
 	}
-	exp, err := exporter.NewPuppetDBExporter(c.PuppetDBUrl, c.CertFile, c.CACertFile, c.KeyFile, c.SSLSkipVerify, categories)
+
+	registry := prometheus.NewPedanticRegistry()
+	_, err = exporter.NewPuppetDBExporter(&exporter.Config{
+		URL:                c.PuppetDBUrl,
+		CertPath:           c.CertFile,
+		CACertPath:         c.CACertFile,
+		KeyPath:            c.KeyFile,
+		SSLVerify:          !c.SSLSkipVerify,
+		Categories:         categories,
+		UnreportedDuration: unreportedDuration,
+	}, registry)
 	if err != nil {
 		log.Fatalf("failed to initialize exporter: %s", err)
 	}
-
-	go exp.Scrape(interval, c.UnreportedNode, categories)
 
 	buildInfo := prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "puppetdb_exporter_build_info",
 		Help: "puppetdb exporter build informations",
 	}, []string{"version", "commit_sha", "build_date", "golang_version"})
 	buildInfo.WithLabelValues(version, commitSha1, buildDate, runtime.Version()).Set(1)
-	prometheus.MustRegister(buildInfo)
+	registry.MustRegister(buildInfo)
 
-	http.Handle(c.MetricPath, promhttp.Handler())
+	http.Handle(c.MetricPath, promhttp.HandlerFor(registry, promhttp.HandlerOpts{}))
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`
 <html>
