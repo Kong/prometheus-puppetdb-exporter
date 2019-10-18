@@ -106,9 +106,12 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 		}
 
 		ch <- prometheus.MustNewConstMetric(
-			e.metrics["report"], prometheus.GaugeValue,
+			e.metrics["report"],
+			prometheus.GaugeValue,
 			float64(latestReport.Unix()),
-			node.ReportEnvironment, node.Certname, deactivated)
+			node.ReportEnvironment,
+			node.Certname,
+			deactivated)
 
 		if latestReport.Add(e.unreportedDuration).Before(time.Now()) {
 			statuses["unreported"]++
@@ -125,7 +128,8 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 			e.metrics["node_last_report_status"],
 			prometheus.GaugeValue,
 			1,
-			lastReportStatus, node.Certname,
+			lastReportStatus,
+			node.Certname,
 		)
 
 		if node.LatestReportHash != "" {
@@ -135,7 +139,8 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 				if ok {
 					category := fmt.Sprintf("report_%s", reportMetric.Category)
 					ch <- prometheus.MustNewConstMetric(
-						e.metrics[category], prometheus.GaugeValue,
+						e.metrics[category],
+						prometheus.GaugeValue,
 						reportMetric.Value,
 						strings.ReplaceAll(strings.Title(reportMetric.Name), "_", " "),
 						node.ReportEnvironment,
